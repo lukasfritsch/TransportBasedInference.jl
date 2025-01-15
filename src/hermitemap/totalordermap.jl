@@ -34,7 +34,7 @@ $(TYPEDSIGNATURES)
 Creates an `Hermitemap` of order `order` for the basis `b`. The size of the map is extracted from the ensemble matrix `X`.
 The features of the created maps are all the tensorial products of the basis elements up to the order `order`.
 """
-function totalordermap(X::Array{Float64,2}, order::Int64; diag::Bool=true, factor::Float64 = 1.0, withconstant::Bool = false, b::String = "CstProHermite")
+function totalordermap(X::Array{Float64,2}, order::Int64; diag::Bool=true, factor::Float64 = 1.0, withconstant::Bool = false, b::String = "CstProHermiteBasis")
 
     L = LinearTransform(X; diag = diag, factor = factor)
 
@@ -44,9 +44,9 @@ function totalordermap(X::Array{Float64,2}, order::Int64; diag::Bool=true, facto
         push!(C, totalordermapcomponent(i, order; withconstant = withconstant, b = b))
     end
 
-    if b ∈ ["CstProHermiteBasis"; "CstPhyHermiteBasis"]
+    if b ∈ ["CstProHermiteBasis", "CstPhyHermiteBasis"]
         m = order+2
-    elseif b ∈ ["CstLinProHermiteBasis"; "CstLinPhyHermiteBasis"]
+    elseif b ∈ ["CstLinProHermiteBasis", "CstLinPhyHermiteBasis"]
         m = order+3
     else
         error("Undefined basis")
@@ -54,3 +54,4 @@ function totalordermap(X::Array{Float64,2}, order::Int64; diag::Bool=true, facto
 
     return HermiteMap(m, Nx, L, C)
 end
+

@@ -12,7 +12,7 @@ $(TYPEDEF)
 
 `LinHermiteMapComponent` is a type to hold  the composition of a `LinearTransform`: a linear transformation that rescales
 the samples to get zero mean and unitary standard deviation component-wise
-and  an `HermiteMapComponent` element.
+and an `HermiteMapComponent` element.
 
 ## Fields
 

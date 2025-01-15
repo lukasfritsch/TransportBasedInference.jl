@@ -3,8 +3,10 @@ module TransportBasedInference
 using ColorTypes
 using DocStringExtensions
 using Distributions
+using FastGaussQuadrature
 using ForwardDiff
 using IterativeSolvers
+using IterTools
 using JLD
 using LaTeXStrings
 using LinearAlgebra
@@ -24,8 +26,10 @@ using Roots
 using SpecialFunctions
 using Statistics
 using StochasticDiffEq
+using SparseGrids
 using TensorOperations
 using ThreadPools
+using QuasiMonteCarlo
 
 include("tools/get.jl")
 include("tools/parallel.jl")
@@ -42,6 +46,10 @@ include("tools/banana.jl")
 # Tools for mixture of Gaussian distributions
 include("tools/mixture.jl")
 include("tools/view.jl")
+# Tools for numerical quadrature
+include("tools/quadrature.jl")
+# Tools for multidimensional distributions
+include("tools/multidimensionaldist.jl")
 
 # Tools for state-space model
 include("statespace/system.jl")
@@ -115,6 +123,8 @@ include("hermitemap/hermitemap.jl")
 include("hermitemap/totalordermap.jl")
 include("hermitemap/stochmapfilter.jl")
 
+# Transport map from density
+include("hermitemap/densitymap.jl")
 
 # Tools for radial maps
 include("radialmap/function.jl")

@@ -1,4 +1,4 @@
-using Documenter, TransportBasedInference, Plots
+using Documenter, TransportBasedInference, Plots, Literate
 
 const EXAMPLES_DIR = joinpath(@__DIR__, "..", "examples")
 const OUTPUT_DIR   = joinpath(@__DIR__, "src/generated")
@@ -6,8 +6,8 @@ const OUTPUT_DIR   = joinpath(@__DIR__, "src/generated")
 examples = [
     "1.-Estimation-of-the-Banana-distribution.jl",
     "2.-Conditional-density-estimation-of-the-Banana-distribution.jl",
-    "3.-Structure-discovery-of-the-Lorenz-96.jl",
-    "4.-Linear-ensemble-filtering-Lorenz-63.jl",
+    #"3.-Structure-discovery-of-the-Lorenz-96.jl",
+    #"4.-Linear-ensemble-filtering-Lorenz-63.jl",
 ]
 
 function uncomment_objects(str)
@@ -17,10 +17,10 @@ function uncomment_objects(str)
     str
 end
 
-for example in examples
-    example_filepath = joinpath(EXAMPLES_DIR, example)
-    Literate.markdown(example_filepath, OUTPUT_DIR; execute=true, postprocess = uncomment_objects)
-end
+# for example in examples
+#     example_filepath = joinpath(EXAMPLES_DIR, example)
+#     Literate.markdown(example_filepath, OUTPUT_DIR; execute=true, postprocess = uncomment_objects)
+# end
 
 # makedocs(
 #     modules = [TransportBasedInference],
@@ -42,26 +42,27 @@ end
 # )
 
 makedocs(
-            doctest = false,
-            format = Documenter.HTML(),
-            sitename = "TransportBasedInference.jl",
-            authors = "Mathieu Le Provost",
-            pages = Any[
-                    "Home" => "index.md",
-                    # "Development" => "dev.md",
-                    "Examples" => [
-                        "generated/1.-Estimation-of-the-Banana-distribution.md",
-                        "generated/2.-Conditional-density-estimation-of-the-Banana-distribution.md",
-                        "generated/3.-Structure-discovery-of-the-Lorenz-96.md",
-                        "generated/4.-Linear-ensemble-filtering-Lorenz-63.md",
-                        ],
-                    ]
-        )
+    doctest = false,
+    remotes = nothing,
+    format = Documenter.HTML(),
+    sitename = "TransportBasedInference.jl",
+    authors = "Mathieu Le Provost",
+    pages = Any[
+            "Home" => "index.md",
+            # "Development" => "dev.md",
+            "Examples" => [
+                "generated/1.-Estimation-of-the-Banana-distribution.md",
+                "generated/2.-Conditional-density-estimation-of-the-Banana-distribution.md",
+                #"generated/3.-Structure-discovery-of-the-Lorenz-96.md",
+                #"generated/4.-Linear-ensemble-filtering-Lorenz-63.md",
+                ],
+            ]
+)
 
 
 # Documenter can also automatically deploy documentation to gh-pages.
 # See "Hosting Documentation" and deploydocs() in the Documenter manual
 # for more information.
-deploydocs(
-    repo = "https://github.com/mleprovost/TransportBasedInference.jl.git"
-)
+# deploydocs(
+#     repo = "https://github.com/mleprovost/TransportBasedInference.jl.git"
+# )
