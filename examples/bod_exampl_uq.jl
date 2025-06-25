@@ -7,15 +7,19 @@ using Revise
 using TransportBasedInference
 using Statistics
 using Distributions
-
 using Plots
-default(fontfamily = "Computer Modern",
-        tickfont = font("Computer Modern", 9),
-        titlefont = font("Computer Modern", 14),
-        guidefont = font("Computer Modern", 12),
-        legendfont = font("Computer Modern", 10),
-        grid = false)
 using LaTeXStrings
+
+default(
+    framestyle=:box,
+    fontfamily = "Computer Modern",
+    tickfont = font("Computer Modern", 9),
+    titlefont = font("Computer Modern", 14),
+    guidefont = font("Computer Modern", 12),
+    legendfont = font("Computer Modern", 10),
+    grid = true,
+    margin = 5*Plots.mm
+)
 
 # Define the model
 function forward_model(t, θ1, θ2)
@@ -51,9 +55,6 @@ likelihood = df -> df.L
 tmcmc = TransitionalMarkovChainMonteCarlo(prior, 1000, 5)
 tmcmc_samples, S = bayesianupdating(likelihood, [L], tmcmc)
 
-# Plot the samples
-scatter(tmcmc_samples.θ1, tmcmc_samples.θ2, label = "TMCMC samples")
-
 # Get samples as matrix and define the dimension
 X = reduce(vcat, [tmcmc_samples.θ1', tmcmc_samples.θ2'])
 m = 15
@@ -62,13 +63,13 @@ m = 15
 S = HermiteMap(m, X; diag = true, b = "CstLinProHermiteBasis");
 
 # Optimization
-@time optimize(S, X, 15; withqr = true, verbose = true, P=Thread())
+@time TransportBasedInference.optimize(S, X, 15; withqr = true, verbose = true, P=Thread())
 
 # Plot comparison
 Nlog = 100
 
-xrange = range(-1.0; stop = 4.0, length = Nlog)
-yrange = range(-1.0; stop = 4.0, length = Nlog)
+xrange = range(-1.0; stop = 2.0, length = Nlog)
+yrange = range(-1.0; stop = 3.0, length = Nlog)
 
 logposterior = zeros(Nlog, Nlog)
 logapprox = zeros(Nlog, Nlog)
@@ -82,13 +83,17 @@ for (i,x) in enumerate(xrange)
     end
 end
 
-plt = plot(layout = grid(1, 2), colorbar = false, grid = false)
-contour!(plt[1,1], xrange, yrange, exp.(logposterior)', ratio = 1,
+plt = plot(layout = grid(1, 2), colorbar = false, size=(1200,800))
+contour!(plt, xrange, yrange, exp.(logposterior)', ratio = 1, subplot=1,
          title = "True density",
-         color = cgrad([:dodgerblue4, :deepskyblue3, :skyblue, :olivedrab1, :yellow, :orange, :red, :firebrick]),
-         xlim = (xrange[1], xrange[end]), ylim = (-Inf, Inf), linewidth = 3)
+         cmap=:blues,
+         xlim = (xrange[1], xrange[end]), ylim = (-Inf, Inf), linewidth = 3,
+         xlabel=L"x_1", ylabel=L"x_2")
 
-contour!(plt[1,2], xrange, yrange, exp.(logapprox)', ratio = 1,
+contour!(plt, xrange, yrange, exp.(logapprox)', ratio = 1, subplot=2,
          title = "ATM approximate",
-         color = cgrad([:dodgerblue4, :deepskyblue3, :skyblue, :olivedrab1, :yellow, :orange, :red, :firebrick]),
-         xlim = (xrange[1], xrange[end]), ylim = (-Inf, Inf), linewidth = 3)
+         xlim = (xrange[1], xrange[end]), ylim = (-Inf, Inf), linewidth = 3,
+         xlabel=L"x_1", ylabel=L"x_2")
+
+# scatter!(plt, X[1,:], X[2,:], markersize=2, msw=0, mα=0.8, c=1, subplot=1, label=false)
+# scatter!(plt, X[1,:], X[2,:], markersize=2, msw=0, mα=0.8, c=2, subplot=2, label=false)

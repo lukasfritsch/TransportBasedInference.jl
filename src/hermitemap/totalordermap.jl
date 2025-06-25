@@ -8,7 +8,9 @@ The features of the created maps are all the tensorial products of the basis ele
 """
 function totalordermapcomponent(Nx::Int64, order::Int64; withconstant::Bool = false, b::String = "CstProHermiteBasis")
     @assert order >= 0 "Order should be positive"
-    if b ∈ ["CstProHermiteBasis"; "CstPhyHermiteBasis"]
+    if b ∈ ["ProHermiteBasis"; "PhyHermiteBasis"]
+        MB = MultiBasis(eval(Symbol(b))(order+1), Nx)
+    elseif b ∈ ["CstProHermiteBasis"; "CstPhyHermiteBasis"]
         MB = MultiBasis(eval(Symbol(b))(order+2), Nx)
     elseif b ∈ ["CstLinProHermiteBasis"; "CstLinPhyHermiteBasis"]
         MB = MultiBasis(eval(Symbol(b))(order+3), Nx)
@@ -54,4 +56,3 @@ function totalordermap(X::Array{Float64,2}, order::Int64; diag::Bool=true, facto
 
     return HermiteMap(m, Nx, L, C)
 end
-

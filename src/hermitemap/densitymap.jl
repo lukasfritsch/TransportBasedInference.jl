@@ -1,10 +1,15 @@
 export
     HermiteMap,
     totalordermap,
-    optimize,
+    optimize!,
     setcoeff!,
+    ncoeff,
     grad_xd,
-    objective_KL
+    grad_coeff,
+    grad_coeff_grad_xd,
+    objective_KL!,
+    objective_KL,
+    logdeterminant
 
 import Base: @propagate_inbounds
 
@@ -83,7 +88,9 @@ function totalordermap(order::Int64, d::Int64; withconstant::Bool = false, b::St
         push!(C, totalordermapcomponent(i, order; withconstant = withconstant, b = b))
     end
 
-    if b ∈ ["CstProHermiteBasis", "CstPhyHermiteBasis"]
+    if b ∈ ["ProHermiteBasis", "PhyHermiteBasis"]
+        m = order+1
+    elseif b ∈ ["CstProHermiteBasis", "CstPhyHermiteBasis"]
         m = order+2
     elseif b ∈ ["CstLinProHermiteBasis", "CstLinPhyHermiteBasis"]
         m = order+3
@@ -92,6 +99,13 @@ function totalordermap(order::Int64, d::Int64; withconstant::Bool = false, b::St
     end
 
     return HermiteMap(m, d, L, C)
+end
+
+"""
+    ncoeff(M::HermiteMap) -> Int64
+"""
+function ncoeff(M::HermiteMap)
+    return sum([ncoeff(component) for component in M.C])
 end
 
 # Set the coefficients in all map components.
@@ -103,65 +117,17 @@ function setcoeff!(M::HermiteMap, a::Vector{Float64})
     end
 end
 
-# Optimize the map using the KL divergence
-function optimize(M::HermiteMap, Target::MultidimensionalDistribution,
-    quadrature::QuadraturePoints, optimkind::Union{Nothing, Int64, String};
-    apply_rescaling::Bool=true, α::Float64=.0)
-
-    # Perform greedy optimization with max terms
-    if optimkind ∈ ["nonadaptive", "non_adaptive", "non-adaptive"]
-        a_opt = nonadaptive(M, Target, quadrature; α)
-    end
-
-    # Set map components
-    setcoeff!(M, a_opt)
-
-    # if apply_rescaling == true
-    #     itransform!(M.L, X)
-    # end
-
-    return M
-
-end
-
-function nonadaptive(M::HermiteMap, Target::MultidimensionalDistribution,
-    quadrature::QuadraturePoints; α::Float64=.0)
-
-    # Initialize coefficients
-    a₀ = zeros(sum([ncoeff(component) for component in M.C]))
-
-    # Optimize map
-    objective(a) = objective_KL(M, Target, quadrature, a, α)
-
-    # TODO Test optimization using this function and autodiff with a greedy fit
-
-    # Perform optimization using LBFGS and automatic differentiation
-    result = Optim.optimize(
-        a -> objective_function(a, M, X),
-        a -> gradient_function(a, M, X),
-        a₀,
-        Optim.LBFGS()
-    )
-
-    # TODO Check if the optimization converged
-
-
-    # Extract the optimized coefficients
-    return Optim.minimizer(result)
-
-end
-
 """
-    grad_xd(M::HermiteMap, X::Matrix{Float64}) -> Array{Any,1}
+    grad_xd(M::HermiteMap, X::Matrix{Float64}) -> Matrix{Float64}
 
-Compute the gradient of the Hermite map `M` with respect to the input matrix `X`.
+Compute the gradient of the Hermite map `M` with respect to the coordiantes x evaluated at `X`.
 
 # Arguments
 - `M::HermiteMap`: The Hermite map object containing components.
-- `X::Matrix{Float64}`: The input matrix for which the gradient is computed.
+- `X::Matrix{Float64}`: The input matrix.
 
 # Returns
-- `Vector{Float64}`: An array of gradients for each component in the Hermite map.
+- `Matrix{Float64}`: An array of gradients for each component in the Hermite map.
 
 """
 function grad_xd(M::HermiteMap, X::Matrix{Float64})
@@ -172,6 +138,58 @@ function grad_xd(M::HermiteMap, X::Matrix{Float64})
     end
 
     return ∇M
+end
+
+"""
+    grad_coeff(M::HermiteMap, X::Matrix{Float64}) -> Array{Float64, 3}
+
+Compute the gradient of the Hermite map `M` with respect to the coefficients evaluated at `X`.
+
+# Arguments
+- `M::HermiteMap`: The Hermite map object containing components.
+- `X::Matrix{Float64}`: The input matrix.
+
+# Returns
+- `Array{Float64, 3}`: An array of gradients for each component in the Hermite map.
+
+"""
+function grad_coeff(M::HermiteMap, X::Matrix{Float64})
+    # initialize array for ∇M: size: N*Nx*Ncoeff
+    ∇M = zeros(size(X,2), M.Nx, ncoeff(M))
+
+    counter = 1
+
+    for (i, component) in enumerate(M.C)
+        ∇M[:,i,counter:counter+component.Nψ-1] += grad_coeff(component.I, X[1:i,:])
+        counter += component.Nψ
+    end
+
+    return ∇M
+end
+
+"""
+    grad_coeff_grad_xd(M::HermiteMap, X::Matrix{Float64}) -> Array{Float64, 3}
+
+"""
+function grad_coeff_grad_xd(M::HermiteMap, X::Matrix{Float64})
+    # initialize array for ∇M: size: N*Nx*Ncoeff
+    ∇M = zeros(size(X,2), M.Nx, ncoeff(M))
+
+    counter = 1
+
+    for (i, component) in enumerate(M.C)
+        ∇M[:,i,counter:counter+component.Nψ-1] += grad_coeff_grad_xd(component.I, X[1:i,:])
+        counter += component.Nψ
+    end
+
+    return ∇M
+end
+
+"""
+    logdeterminant(M::HermiteMap, X::Matrix{Float64}) -> Vector{Float64}
+"""
+function logdeterminant(M::HermiteMap, X::Matrix{Float64})
+    return vec(sum(log.(grad_xd(M, X)), dims=1))
 end
 
 """
@@ -196,49 +214,94 @@ Compute the Kullback-Leibler (KL) divergence objective function for a given Herm
 - The KL divergence is computed using numerical quadrature.
 - L₂ regularization is added to the KL divergence, controlled by the parameter `α`.
 """
-function objective_KL(M::HermiteMap, Target::MultidimensionalDistribution, quadrature::QuadraturePoints,
-    a::Vector{Float64}, α::Float64=.0; δ::Float64=1e-9)
+function objective_KL!(obj::Float64, ∇obj::Vector{Float64}, coeff::Vector{Float64},
+    M::HermiteMap, Target::MultidimensionalDistribution, quadrature::QuadraturePoints,
+    α::Float64, δ::Float64)
 
     # Extract quadrature points and weights
     points = quadrature.points
     weights = quadrature.weights
 
     # Set map components
-    setcoeff!(M, a)
+    setcoeff!(M, coeff)
 
     # evaluate map and its gradient
     Sₓ = evaluate(M, points) .+ δ*points # δ is used for regularization
     ∇Sₓ = grad_xd(M, points) .+ δ
 
-    # compute integrand and numerical quadrature
-    integrand = -Target.logpdf(Sₓ) - vec(sum(log.(∇Sₓ), dims=1))
-    kl_divergence = dot(weights, integrand)
+    # Formatting for Optim.jl
+    if ∇obj !== nothing
+        # Gradient computation (only if required, i.e., when input ∇obj is not nothing)
+        fill!(∇obj, 0.0)
 
-    # Add L₂ regularization specified by α
-    D = α*I(length(a))
-    kl_divergence += a'*D*a
+        # Gradient of map w.r.t. coefficients
+        grad_coefficients = grad_coeff(M, points)
 
-    return kl_divergence
+        # Gradient of gradient of map w.r.t. coefficients w.r.t. x
+        ∇grad_coefficients = grad_coeff_grad_xd(M, points)
+
+        integrand_grad = sum(Target.grad_logpdf(Sₓ)' .* grad_coefficients + ∇grad_coefficients ./ ∇Sₓ', dims=2)
+        integrand_grad = reshape(integrand_grad, size(points, 2), ncoeff(M))
+
+        ∇obj .= -vec(sum(weights .* integrand_grad, dims=1))
+    end
+
+    if obj !== nothing
+        # compute integrand and numerical quadrature
+        integrand = Target.logpdf(Sₓ) + vec(sum(log.(∇Sₓ), dims=1))
+        obj = -dot(weights, integrand)
+
+        # Add L₂ regularization specified by α
+        D = α*I(length(coeff))
+        obj += coeff'*D*coeff
+        return obj
+    end
+
 end
 
-# TODO: compute gradient of map w.r.t. the coefficients a
-# TODO: make compatible with `Optim.only_fg!` as seen here:
-# * https://julianlsolvers.github.io/Optim.jl/stable/user/tipsandtricks/
-# * and in the `negative_log_likelihood` function in `src/hermitemap/hermitemapcomponent.jl`
-# For the gradient of the objective function we need to take care of the gradient of the
-# target pdf given in Target.gradient()
-function objective_gradient(f, ∇f, coeff)
-    # do common computations here
-    # ...
-    if ∇f !== nothing
-        # code to compute gradient here
-        # writing the result to the vector ∇f
-        # ∇f .= ...
+# Wrapper function for optimization
+objective_KL(M, Target, Quadrature, α, δ) =
+    (obj, ∇obj, coeff) -> objective_KL!(obj, ∇obj, coeff, M, Target, Quadrature, α, δ)
 
-        # ! This depends on the gradient of the target pdf!
+# Optimize the map using the KL divergence
+function nonadaptive(M::HermiteMap, Target::MultidimensionalDistribution, Quadrature::QuadraturePoints,
+    α::Float64, δ::Float64)
+
+    # Perform optimization using LBFGS and automatic differentiation
+    @time result = Optim.optimize(
+        Optim.only_fg!(objective_KL(M, Target, Quadrature, α, δ)),
+        zeros(ncoeff(M)), # initialize with zeros
+        Optim.LBFGS(),
+        Optim.Options(show_trace=false, iterations=1000)
+    )
+
+    if !Optim.converged(result)
+        println("Optimization hasn't converged")
     end
-    if f !== nothing
-        # value = ... code to compute objective function
-        return value
+
+    return Optim.minimizer(result)
+
+end
+
+# Optimize the map using the KL divergence
+function optimize!(M::HermiteMap, Target::MultidimensionalDistribution,
+    Quadrature::QuadraturePoints, optimkind::Union{Nothing, Int64, String};
+    apply_rescaling::Bool=true, α::Float64=.0, δ::Float64=1e-9)
+
+    # Perform greedy optimization with max terms
+    if isnothing(optimkind) || optimkind ∈ ["nonadaptive", "non_adaptive", "non-adaptive"]
+        a_opt = nonadaptive(M, Target, Quadrature, α, δ)
+    end
+
+    # Set map components
+    setcoeff!(M, a_opt)
+
+    if apply_rescaling == true
+    #     itransform!(M.L, X)
     end
 end
+
+# Wrapper function for optimization for greedy optimization
+optimize!(M::HermiteMap, Target::MultidimensionalDistribution, Quadrature::QuadraturePoints;
+apply_rescaling::Bool=true, α::Float64=.0, δ::Float64=1e-9) =
+    optimize!(M, Target, Quadrature, nothing; apply_rescaling=apply_rescaling, α=α, δ=δ)

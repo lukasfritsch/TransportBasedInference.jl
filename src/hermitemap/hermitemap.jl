@@ -12,6 +12,7 @@ export  HermiteMap,
         reduced_hess_x_log_pdf,
         optimize,
         inverse!,
+        inverse,
         hybridinverse!
 
 import Base: @propagate_inbounds
@@ -679,6 +680,12 @@ function inverse!(X, F, M::HermiteMap; apply_rescaling::Bool=true, P::Parallel =
         if apply_rescaling == true
             itransform!(M.L, X)
         end
+end
+
+function inverse(M::HermiteMap, X::Matrix{Float64}, F::Matrix{Float64}; apply_rescaling::Bool=true, P::Parallel = serial)
+    Xnew = copy(X)
+    inverse!(Xnew, F, M; apply_rescaling = apply_rescaling, P = P)
+    return Xnew
 end
 
 
